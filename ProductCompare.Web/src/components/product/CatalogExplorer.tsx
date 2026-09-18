@@ -1,0 +1,13 @@
+'use client';
+import { useState } from 'react';
+import type { Product, Category } from '@/types/catalog';
+import Link from 'next/link';
+import { ProductCard } from './ProductCard';
+export function CatalogExplorer({products,categories}:{products:Product[];categories:Category[]}){
+ const [search,setSearch]=useState('');
+ const result=products.filter(p=>p.name.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR')));
+ return <><section className="hero"><div className="container"><div className="hero-kicker"><span/>DAHA BİLİNÇLİ BİR SEÇİM</div><h1>Detayları keşfet.<br/><em>Doğru ürünü seç.</em></h1><p>Teknik özellikler, güncel fiyatlar ve ürün detayları.<br/>Merak ettiğin her şey, tek bir yerde.</p><div id="urun-ara" className="hero-search"><span aria-hidden="true">⌕</span><input aria-label="Görüntülenen ürünlerde ara" placeholder="Hangi ürünü keşfetmek istersin?" value={search} onChange={e=>setSearch(e.target.value)}/><a className="button primary" href="#urunler">Ürünleri keşfet <span>→</span></a></div><small className="search-note">Bu sayfada görüntülenen {products.length} ürün içinde arama yapın.</small><div className="hero-bottom"><span>Teknik özellikleri keşfet</span><span>Fiyat bilgilerini incele</span><span>Seçimini kolaylaştır</span></div><div className="hero-art" aria-hidden="true"><div className="art-orbit"/><div className="art-device"><span/><span/><span/><div/></div><div className="art-chip">Detaylarda fark var. <b>↗</b></div></div></div></section>
+ <section id="kategoriler" className="container categories-section"><div className="section-heading"><div><p className="eyebrow">KEŞFETMEYE BAŞLA</p><h2>Kategorilere göz at</h2></div><span className="subtle">{categories.length} kategori</span></div><div className="category-grid">{categories.map((c,i)=><Link key={c.id} href={'/kategori/'+c.slug} className="category-card"><span className="category-icon" aria-hidden="true">{['▧','▯','▱'][i%3]}</span><span><strong>{c.name}</strong><small>Ürünleri keşfet</small></span><b>↗</b></Link>)}</div>{!categories.length&&<div className="empty">Henüz kategori bulunmuyor.</div>}</section>
+ <section id="urunler" className="container products-section"><div className="section-heading"><div><p className="eyebrow">KATALOGDAN SEÇTİKLERİMİZ</p><h2>{search?'Arama sonuçları':'Ürünleri yakından tanı'}</h2></div><span className="subtle">{result.length} ürün</span></div><div className="product-grid">{result.map(p=><ProductCard key={p.id} product={p}/>)}</div>{!result.length&&<div className="empty">Bu sayfada eşleşen ürün bulunamadı. Kategorilere göz atabilirsiniz.</div>}</section></>;
+}
+

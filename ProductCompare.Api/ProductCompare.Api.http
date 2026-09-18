@@ -1,0 +1,41 @@
+@host = http://localhost:5080
+
+### Seed product detail
+GET {{host}}/api/products/by-slug/apple-iphone-14-pro-256-gb
+
+### IDs for product creation
+GET {{host}}/api/categories
+
+###
+GET {{host}}/api/brands
+
+###
+GET {{host}}/api/attributes
+
+### Use IDs returned above (seed IDs are not assumed)
+@categoryId = 2
+@brandId = 1
+@ramId = 1
+@storageId = 2
+@processorId = 6
+
+### Create
+POST {{host}}/api/products
+Content-Type: application/json
+
+{
+  "categoryId": {{categoryId}},
+  "brandId": {{brandId}},
+  "name": "Örnek Telefon",
+  "currentPrice": 19999.90,
+  "currency": "TRY",
+  "attributes": [
+    { "attributeDefinitionId": {{ramId}}, "numericValue": 8 },
+    { "attributeDefinitionId": {{storageId}}, "numericValue": 256 },
+    { "attributeDefinitionId": {{processorId}}, "textValue": "Örnek işlemci" }
+  ]
+}
+
+### Pagination
+GET {{host}}/api/products?page=1&pageSize=20
+

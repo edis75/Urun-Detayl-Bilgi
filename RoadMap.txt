@@ -1,0 +1,27 @@
+1. aşamada sadece Category → Attribute → Product veri modelini kurarız. Burada database'i sağlamlaştırırız.
+
+2. aşamada Product CRUD + admin panel oluştururuz. 20-30 gerçek telefon verisi yükleriz.
+
+3. aşamada ürün detay sayfası ve kategori sayfasını çıkarırız.
+
+4. aşamada karşılaştırma motorunu yaparız:
+
+iPhone 14 Pro
+       VS
+iPhone 15 Pro
+
+Burada veri modelinin gerçekten çalışıp çalışmadığı ortaya çıkar.
+
+5. aşamada Elasticsearch bağlarız. Search + autocomplete + typo tolerance + synonym + filters.
+
+6. aşamada Merchant + Offer + PriceHistory ekleriz.
+
+7. aşamada editorial inceleme / kullanıcı yorumları / favoriler / fiyat alarmı.
+
+8. aşamada import pipeline, worker, Redis, cache, monitoring.
+
+9. aşamada semantic/AI search ve recommendation sistemi.
+
+Bu sıralama önemli; ilk gün Elasticsearch + Redis + RabbitMQ + microservice + AI koyarsak ürün daha ortaya çıkmadan infrastructure projesi yazmaya başlarız.
+
+Benim ilk teknik hedefim şu olur:

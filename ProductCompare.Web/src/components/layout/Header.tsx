@@ -1,0 +1,3 @@
+import Link from 'next/link';
+export function Header(){return <><div className="announcement">Doğru ürünü seçmek, detayları bilmekle başlar.</div><header className="site-header"><div className="container header-inner"><Link className="logo" href="/"><span className="logo-symbol">pc</span>Product<span>Compare</span><i/></Link><nav aria-label="Ana menü"><Link href="/">Ana Sayfa</Link><Link href="/#kategoriler">Kategoriler</Link></nav><Link className="header-search" href="/#urun-ara"><span>⌕</span> Ürün ara…</Link><span className="header-compare" title="Sonraki aşamada kullanıma açılacak">⇄ <span>Karşılaştırma</span><small>Yakında</small></span></div></header></>;}
+
