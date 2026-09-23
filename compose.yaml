@@ -1,6 +1,8 @@
+version: '3.8'
+
 services:
   postgres:
-    image: postgres:18
+    image: postgres:16
     environment:
       POSTGRES_DB: productcompare_db
       POSTGRES_USER: postgres
@@ -8,7 +10,20 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - catalog_data:/var/lib/postgresql
+      - catalog_data:/var/lib/postgresql/data
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: productcompare-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    mem_limit: 1g
+
 volumes:
   catalog_data:
-
+  elasticsearch-data:

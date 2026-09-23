@@ -196,17 +196,6 @@ namespace ProductCompare.Api.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)")
-                        .HasDefaultValue("TRY");
-
-                    b.Property<decimal>("CurrentPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
@@ -251,10 +240,7 @@ namespace ProductCompare.Api.Migrations
                     b.HasIndex("Slug")
                         .IsUnique();
 
-                    b.ToTable("Products", t =>
-                        {
-                            t.HasCheckConstraint("CK_Product_Price", "\"CurrentPrice\" >= 0");
-                        });
+                    b.ToTable("Products");
                 });
 
             modelBuilder.Entity("ProductCompare.Api.Entities.ProductAttributeValue", b =>

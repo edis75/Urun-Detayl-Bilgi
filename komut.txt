@@ -1,0 +1,3 @@
+docker compose stop elasticsearch
+docker compose start elasticsearcha
+docker compose down

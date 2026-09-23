@@ -70,9 +70,7 @@ public static class SeedData
                 CategoryId = phone.Id,
                 BrandId = apple.Id,
                 ModelCode = generation == 14 ? "A2890" : null,
-                CurrentPrice = generation == 14 ? 52999.90m : 64999.90m,
-                Currency = "TRY",
-                ShortDescription = "Development örnek ürünü; fiyat temsili."
+                ShortDescription = "Development örnek ürünü."
             };
             void Number(string code, decimal value) => p.AttributeValues.Add(new ProductAttributeValue { AttributeDefinitionId = attributes[code].Id, NumericValue = value });
             Number("ram", generation == 14 ? 6 : 8); Number("storage", 256); Number("screen_size", 6.1m); Number("refresh_rate", 120);

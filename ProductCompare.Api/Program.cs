@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProductCompare.Api.Data;
 using ProductCompare.Api.Services;
+using Elastic.Clients.Elasticsearch;
+using ProductCompare.Api.Search;
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
@@ -16,6 +18,14 @@ builder.Services.AddScoped<CategoryService>();
 builder.Services.AddScoped<BrandService>();
 builder.Services.AddScoped<AttributeService>();
 builder.Services.AddScoped<ProductService>();
+builder.Services.AddScoped<ComparisonService>();
+builder.Services.AddSingleton(sp => new ElasticsearchClient(new ElasticsearchClientSettings(
+    new Uri(sp.GetRequiredService<IConfiguration>()["Elasticsearch:Url"]
+        ?? throw new InvalidOperationException("Elasticsearch:Url is required.")))
+    .RequestTimeout(TimeSpan.FromSeconds(15))));
+builder.Services.AddSingleton<ProductSearchIndexService>();
+builder.Services.AddScoped<ProductSearchReindexService>();
+builder.Services.AddScoped<ProductSearchService>();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
@@ -44,4 +54,12 @@ if (app.Environment.IsDevelopment())
     }
 }
 app.MapControllers();
+try
+{
+    await app.Services.GetRequiredService<ProductSearchIndexService>().EnsureIndexAsync();
+}
+catch (Exception exception)
+{
+    app.Logger.LogWarning(exception, "Elasticsearch initialization failed. PostgreSQL endpoints remain available; reindex will retry initialization.");
+}
 app.Run();

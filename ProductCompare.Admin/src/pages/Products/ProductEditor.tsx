@@ -28,17 +28,15 @@ function ProductForm({product}:{product?:Product}){
  function submit(e:FormEvent<HTMLFormElement>){
   e.preventDefault();if(!rules.data||rules.isFetching)return;
   const d=new FormData(e.currentTarget);
-  save.mutate({categoryId,brandId:Number(d.get('brandId')),name:text(d,'name'),modelCode:nullable(d,'modelCode'),shortDescription:nullable(d,'shortDescription'),description:nullable(d,'description'),currentPrice:Number(d.get('currentPrice')),currency:text(d,'currency'),mainImageUrl:nullable(d,'mainImageUrl'),isActive:d.has('isActive'),attributes:serializeAttributes(rules.data,values)});
+  save.mutate({categoryId,brandId:Number(d.get('brandId')),name:text(d,'name'),modelCode:nullable(d,'modelCode'),shortDescription:nullable(d,'shortDescription'),description:nullable(d,'description'),mainImageUrl:nullable(d,'mainImageUrl'),isActive:d.has('isActive'),attributes:serializeAttributes(rules.data,values)});
  }
  if(categories.isPending||brands.isPending)return <Loading/>;
  return <><Link className="back-link" to="/admin/products">← Ürünler</Link><PageTitle title={product?'Ürünü düzenle':'Yeni ürün'} description="Temel bilgileri ekleyin, kategoriye özel teknik alanları doldurun."/><ErrorNotice error={categories.error||brands.error||save.error}/>
  <form onSubmit={submit}><section className="panel"><div className="section-title"><span className="section-number">01</span><div><h2>Temel bilgiler</h2><p>Ürünün katalogda nasıl görüneceğini belirleyin.</p></div></div><div className="form-grid">
- <Field label="Kategori *"><select value={categoryId||''} required onChange={e=>{setCategoryId(Number(e.target.value));setValues({});}}><option value="">Kategori seçin</option>{categories.data?.map(c=><option key={c.id} value={c.id}>{c.name}{!c.isActive?' (Pasif)':''}</option>)}</select></Field>
+ <Field label="Kategori *"><select value={categoryId||''} required onChange={e=>{setCategoryId(Number(e.target.value));setValues({});}}><option value="">Kategori seçin</option>{categories.data?.map(c=><option key={c.id} value={c.id} disabled={!c.isSelectable}>{c.pathName}{!c.isActive?' (Pasif)':''}</option>)}</select></Field>
  <Field label="Marka *"><select name="brandId" required defaultValue={product?.brand.id??''}><option value="">Marka seçin</option>{brands.data?.map(b=><option key={b.id} value={b.id}>{b.name}{!b.isActive?' (Pasif)':''}</option>)}</select></Field>
  <Field label="Ürün adı *"><input name="name" required maxLength={300} defaultValue={product?.name} placeholder="Örn. Apple iPhone 15 Pro 256 GB"/></Field>
  <Field label="Model kodu"><input name="modelCode" maxLength={150} defaultValue={product?.modelCode??''}/></Field>
- <Field label="Fiyat *"><input name="currentPrice" type="number" min="0" max="9999999999999999.99" step="0.01" required defaultValue={product?.currentPrice??0}/></Field>
- <Field label="Para birimi *"><input name="currency" required pattern="[A-Z]{3}" maxLength={3} defaultValue={product?.currency??'TRY'}/></Field>
  <Field label="Görsel URL"><input name="mainImageUrl" type="url" maxLength={2048} defaultValue={product?.mainImageUrl??''} placeholder="https://…"/></Field>
  <Check name="isActive" label="Ürün aktif" value={product?.isActive??true}/>
  <Field label="Kısa açıklama"><textarea name="shortDescription" maxLength={1000} defaultValue={product?.shortDescription??''}/></Field>

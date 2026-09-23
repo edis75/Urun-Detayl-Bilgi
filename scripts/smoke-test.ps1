@@ -46,6 +46,7 @@ try {
  $null = Request PUT "/api/categories/$($c2.id)" @{ name=$c2.name; parentCategoryId=$c.id } 200
  $null = Request PUT "/api/categories/$($c.id)" @{ name=$c.name; parentCategoryId=$c2.id } 400
  $null = Request DELETE "/api/categories/$($c.id)" $null 409
+ $null = Request PUT "/api/categories/$($c2.id)" @{ name=$c2.name; parentCategoryId=$null } 200
  $b = Request POST '/api/brands' @{ name="Test $tag"; isActive=$false } 201
  $createdBrands += $b.id
  Assert (-not $b.isActive) 'Inactive brand became active'
@@ -63,7 +64,7 @@ try {
  }
  $null = Request POST "/api/categories/$($c.id)/attributes" @{ attributeDefinitionId=$a.id } 409
  $null = Request DELETE "/api/attributes/$($a.id)" $null 409
- $p = @{ categoryId=$c.id; brandId=$b.id; name="Product $tag"; currentPrice=12.34; attributes=@(); isActive=$false }
+ $p = @{ categoryId=$c.id; brandId=$b.id; name="Product $tag"; attributes=@(); isActive=$false }
  $null = Request POST '/api/products' $p 400
  $p.attributes = @($null)
  $null = Request POST '/api/products' $p 400
@@ -99,8 +100,6 @@ try {
  Assert ($page.totalCount -eq 1 -and $page.totalPages -eq 1 -and $page.items.Count -eq 1) 'Pagination/filter failed'
  $null = Request GET '/api/products?pageSize=101' $null 400
  $null = Request GET '/api/products?page=0' $null 400
- $p.currentPrice = -1
- $null = Request POST '/api/products' $p 400
  $null = Request GET '/api/products/9223372036854775807' $null 404
  $null = Request GET '/api/brands'
  $null = Request GET '/api/categories'

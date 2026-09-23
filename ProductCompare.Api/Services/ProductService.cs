@@ -11,12 +11,20 @@ public class ProductService(AppDbContext db, SlugService slugs)
     private async Task<List<ProductResponse>> MapAsync(List<Product> products, CancellationToken ct)
     {
         var categories = products.Select(x => x.CategoryId).Distinct().ToArray();
-        var order = await db.CategoryAttributes.AsNoTracking().Where(x => categories.Contains(x.CategoryId)).ToDictionaryAsync(x => (x.CategoryId, x.AttributeDefinitionId), x => x.DisplayOrder, ct);
-        return products.Select(p => new ProductResponse(p.Id, p.Name, p.Slug, p.ModelCode, new(p.Category.Id, p.Category.Name, p.Category.Slug),
-         new(p.Brand.Id, p.Brand.Name, p.Brand.Slug), p.ShortDescription, p.Description, p.CurrentPrice, p.Currency, p.MainImageUrl, p.IsActive, p.CreatedAtUtc, p.UpdatedAtUtc,
-         p.AttributeValues.OrderBy(v => order.GetValueOrDefault((p.CategoryId, v.AttributeDefinitionId))).ThenBy(v => v.AttributeDefinitionId)
-          .Select(v => new TechnicalAttributeResponse(v.AttributeDefinitionId, v.AttributeDefinition.Name, v.AttributeDefinition.Code, v.AttributeDefinition.DataType,
-           Value(v), v.AttributeDefinition.Unit)).ToList())).ToList();
+        var rules = await db.CategoryAttributes.AsNoTracking().Where(x => categories.Contains(x.CategoryId))
+            .ToDictionaryAsync(x => (x.CategoryId, x.AttributeDefinitionId), x => new { x.DisplayOrder, x.IsComparable }, ct);
+        return products.Select(p =>
+        {
+            var attributes = p.AttributeValues.OrderBy(v => rules.GetValueOrDefault((p.CategoryId, v.AttributeDefinitionId))?.DisplayOrder ?? 0)
+                .ThenBy(v => v.AttributeDefinitionId)
+                .Select(v => new TechnicalAttributeResponse(v.AttributeDefinitionId, v.AttributeDefinition.Name, v.AttributeDefinition.Code,
+                    v.AttributeDefinition.DataType, Value(v), v.AttributeDefinition.Unit)).ToList();
+            var comparable = attributes.Where(a => rules.GetValueOrDefault((p.CategoryId, a.AttributeId))?.IsComparable == true).ToList();
+            var summary = (comparable.Count > 0 ? comparable : attributes).Take(4).ToList();
+            return new ProductResponse(p.Id, p.Name, p.Slug, p.ModelCode, new(p.Category.Id, p.Category.Name, p.Category.Slug),
+         new(p.Brand.Id, p.Brand.Name, p.Brand.Slug), p.ShortDescription, p.Description, p.MainImageUrl, p.IsActive, p.CreatedAtUtc, p.UpdatedAtUtc,
+                attributes, summary);
+        }).ToList();
     }
     private static object? Value(ProductAttributeValue v) => v.AttributeDefinition.DataType switch
     {
@@ -28,12 +36,19 @@ public class ProductService(AppDbContext db, SlugService slugs)
     };
     public async Task<ProductResponse> GetAsync(long id, CancellationToken ct) =>
      (await MapAsync([await Details.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw ApiException.NotFound()], ct))[0];
+    public async Task<List<ProductResponse>> GetManyAsync(long[] ids, CancellationToken ct)
+    {
+        var products = await MapAsync(await Details.Where(p => ids.Contains(p.Id)).ToListAsync(ct), ct);
+        var byId = products.ToDictionary(p => p.Id);
+        return ids.Where(byId.ContainsKey).Select(id => byId[id]).ToList();
+    }
     public async Task<ProductResponse> BySlugAsync(string slug, CancellationToken ct) =>
      (await MapAsync([await Details.SingleOrDefaultAsync(x => x.Slug == slug, ct) ?? throw ApiException.NotFound()], ct))[0];
-    public async Task<PagedResponse<ProductResponse>> ListAsync(long? categoryId, long? brandId, bool? isActive, int page, int pageSize, CancellationToken ct)
+    public async Task<PagedResponse<ProductResponse>> ListAsync(long? categoryId, long? brandId, bool? isActive, int page, int pageSize, CancellationToken ct, string? search = null)
     {
         if (page < 1 || pageSize < 1 || pageSize > 100 || (long)(page - 1) * pageSize > int.MaxValue) throw ApiException.Invalid("page >= 1 ve pageSize 1–100 olmalıdır.");
         var q = Details;
+        if (!string.IsNullOrWhiteSpace(search)) q = q.Where(x => x.Name.ToLower().Contains(search.Trim().ToLower()));
         if (categoryId.HasValue) q = q.Where(x => x.CategoryId == categoryId);
         if (brandId.HasValue) q = q.Where(x => x.BrandId == brandId);
         if (isActive.HasValue) q = q.Where(x => x.IsActive == isActive);
@@ -69,17 +84,19 @@ public class ProductService(AppDbContext db, SlugService slugs)
     {
         await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         var p = id.HasValue ? await db.Products.Include(x => x.AttributeValues).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw ApiException.NotFound() : new Product();
-        if (!await db.Categories.AnyAsync(x => x.Id == r.CategoryId, ct)) throw ApiException.Invalid("Kategori bulunamadı.");
+        var categories = await db.Categories.AsNoTracking().ToDictionaryAsync(c => c.Id, ct);
+        if (CategoryService.Path(r.CategoryId, categories).Any(c => !c.IsActive))
+            throw ApiException.Invalid("Aktif bir kategori seçin.");
+        if (categories.Values.Any(c => c.ParentCategoryId == r.CategoryId && c.IsActive))
+            throw ApiException.Invalid("Ürün için en alt seviyedeki kategoriyi seçin.");
         if (!await db.Brands.AnyAsync(x => x.Id == r.BrandId, ct)) throw ApiException.Invalid("Marka bulunamadı.");
         var rules = await db.CategoryAttributes.Include(x => x.AttributeDefinition).Where(x => x.CategoryId == r.CategoryId).ToListAsync(ct);
         var errors = ValidateAttributes(r.Attributes, rules);
-        if (r.CurrentPrice < 0 || r.CurrentPrice > 9999999999999999.99m || decimal.Round(r.CurrentPrice, 2) != r.CurrentPrice)
-            errors.Add("Fiyat pozitif veya sıfır ve en fazla iki ondalık basamaklı olmalıdır.");
         if (errors.Count > 0) throw ApiException.Invalid(errors.ToArray());
         p.Slug = await slugs.CreateAsync<Product>(r.Name, 350, id, ct);
         p.Name = r.Name.Trim(); p.CategoryId = r.CategoryId; p.BrandId = r.BrandId; p.ModelCode = r.ModelCode;
-        p.ShortDescription = r.ShortDescription; p.Description = r.Description; p.CurrentPrice = r.CurrentPrice;
-        p.Currency = r.Currency; p.MainImageUrl = r.MainImageUrl; p.IsActive = r.IsActive; p.UpdatedAtUtc = DateTime.UtcNow;
+        p.ShortDescription = r.ShortDescription; p.Description = r.Description;
+        p.MainImageUrl = r.MainImageUrl; p.IsActive = r.IsActive; p.UpdatedAtUtc = DateTime.UtcNow;
         var incoming = r.Attributes.Select(x => x.AttributeDefinitionId).ToHashSet();
         foreach (var old in p.AttributeValues.Where(x => !incoming.Contains(x.AttributeDefinitionId)).ToList())
         { db.ProductAttributeValues.Remove(old); p.AttributeValues.Remove(old); }

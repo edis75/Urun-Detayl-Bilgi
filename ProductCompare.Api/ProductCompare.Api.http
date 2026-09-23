@@ -27,8 +27,6 @@ Content-Type: application/json
   "categoryId": {{categoryId}},
   "brandId": {{brandId}},
   "name": "Örnek Telefon",
-  "currentPrice": 19999.90,
-  "currency": "TRY",
   "attributes": [
     { "attributeDefinitionId": {{ramId}}, "numericValue": 8 },
     { "attributeDefinitionId": {{storageId}}, "numericValue": 256 },
@@ -39,3 +37,18 @@ Content-Type: application/json
 ### Pagination
 GET {{host}}/api/products?page=1&pageSize=20
 
+### Reindex PostgreSQL products into Elasticsearch
+POST {{host}}/api/admin/search/reindex
+
+### Basic Elasticsearch search
+GET {{host}}/api/search?q=iphone%2015&page=1&pageSize=20
+
+### Suggestions (active products, maximum 10)
+GET {{host}}/api/search/suggestions?q=iph
+
+### Filtered search with metadata-driven facets (repeated brandIds)
+GET {{host}}/api/search?q=iphone&categoryId={{categoryId}}&brandIds={{brandId}}&filters[ram]=8&filters[storage]=256&filters[has_5g]=true
+
+### Explicit migration: configured physical target must be empty and not active
+# Already completed for products_v2; use normal reindex on an active index.
+POST {{host}}/api/admin/search/migrate-index

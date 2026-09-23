@@ -11,8 +11,6 @@ public class Product : CatalogEntity
     public string? ModelCode { get; set; }
     public string? ShortDescription { get; set; }
     public string? Description { get; set; }
-    public decimal CurrentPrice { get; set; }
-    public string Currency { get; set; } = "TRY";
     public string? MainImageUrl { get; set; }
     public bool IsActive { get; set; } = true;
     public ICollection<ProductAttributeValue> AttributeValues { get; set; } = new List<ProductAttributeValue>();

@@ -6,6 +6,8 @@ namespace ProductCompare.Api.Controllers;
 [ApiController, Route("api/categories")]
 public class CategoriesController(CategoryService service) : ControllerBase
 {
+    [HttpGet("tree")] public async Task<IActionResult> Tree(CancellationToken ct) => Ok(await service.TreeAsync(ct));
+    [HttpGet("by-slug/{slug}")] public async Task<IActionResult> BySlug(string slug, CancellationToken ct) => Ok(await service.BySlugAsync(slug, ct));
     [HttpGet] public async Task<IActionResult> List(CancellationToken ct) => Ok(await service.ListAsync(ct));
     [HttpGet("{id:long}")] public async Task<IActionResult> Get(long id, CancellationToken ct) => Ok(await service.GetAsync(id, ct));
     [HttpPost]

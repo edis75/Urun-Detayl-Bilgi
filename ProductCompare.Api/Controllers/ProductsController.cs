@@ -7,8 +7,8 @@ namespace ProductCompare.Api.Controllers;
 public class ProductsController(ProductService service) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> List(CancellationToken ct, long? categoryId = null, long? brandId = null, bool? isActive = null, int page = 1, int pageSize = 20)
-     => Ok(await service.ListAsync(categoryId, brandId, isActive, page, pageSize, ct));
+    public async Task<IActionResult> List(CancellationToken ct, long? categoryId = null, long? brandId = null, bool? isActive = null, int page = 1, int pageSize = 20, string? search = null)
+     => Ok(await service.ListAsync(categoryId, brandId, isActive, page, pageSize, ct, search));
     [HttpGet("{id:long}")] public async Task<IActionResult> Get(long id, CancellationToken ct) => Ok(await service.GetAsync(id, ct));
     [HttpGet("by-slug/{slug}")] public async Task<IActionResult> BySlug(string slug, CancellationToken ct) => Ok(await service.BySlugAsync(slug, ct));
     [HttpPost]

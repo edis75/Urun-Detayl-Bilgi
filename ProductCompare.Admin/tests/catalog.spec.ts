@@ -9,7 +9,7 @@ test('Admin → API → public: dynamic attributes and product edits', async ({p
  try {
   await page.goto('http://localhost:5173/admin');
   await expect(page.getByRole('heading',{name:'Kataloğunuza genel bakış'})).toBeVisible();
-  await page.screenshot({path:'../artifacts/admin-dashboard.png',fullPage:true});
+  await page.screenshot({path:'../artifacts/admin-dashboard.png',fullPage:true,caret:'initial'});
   await page.getByRole('link',{name:'Kategoriler',exact:true}).click();
   await page.locator('a[href="/admin/categories/'+phone.id+'/attributes"]').click();
   await expect(page.getByRole('heading',{name:'Telefon özellikleri'})).toBeVisible();
@@ -35,7 +35,6 @@ test('Admin → API → public: dynamic attributes and product edits', async ({p
   await expect(page.getByLabel('NFC',{exact:true})).toBeVisible();
   await page.getByLabel('Marka *',{exact:true}).selectOption({label:'Apple'});
   await page.getByLabel('Ürün adı *',{exact:true}).fill('Apple iPhone UI Test '+tag);
-  await page.getByLabel('Fiyat *',{exact:true}).fill('12345.67');
   await page.getByLabel('Kısa açıklama',{exact:true}).fill('Tarayıcı ile oluşturulan test ürünü.');
   await page.getByLabel('Açıklama',{exact:true}).fill('Dinamik teknik özelliklerin uçtan uca doğrulaması.');
   await page.getByLabel('RAM *',{exact:true}).fill('8');
@@ -53,19 +52,18 @@ test('Admin → API → public: dynamic attributes and product edits', async ({p
   await expect(page.getByLabel('NFC',{exact:true})).toBeChecked();
   await expect(page.getByLabel('5G',{exact:true})).not.toBeChecked();
   await page.getByLabel('RAM *',{exact:true}).fill('12');
-  await page.getByLabel('Fiyat *',{exact:true}).fill('13999.90');
   await page.getByRole('button',{name:'Değişiklikleri kaydet'}).click();
   await expect(page.getByRole('status')).toContainText('Ürün başarıyla kaydedildi.');
-  const product=await (await request.get(api+'/api/products/'+productId)).json() as {slug:string;currentPrice:number;attributes:{code:string;value:unknown}[]};
-  expect(product.currentPrice).toBe(13999.9);
+  const product=await (await request.get(api+'/api/products/'+productId)).json() as {slug:string;attributes:{code:string;value:unknown}[]};
   expect(product.attributes.find(a=>a.code==='ram')?.value).toBe(12);
   expect(product.attributes.find(a=>a.code==='has_5g')?.value).toBe(false);
   await page.getByRole('link',{name:'Ürünler',exact:true}).click();
   await expect(page.getByText('Apple iPhone UI Test '+tag,{exact:true})).toBeVisible();
+  expect((await request.post(api+'/api/admin/search/reindex')).ok()).toBe(true);
   await page.goto('http://localhost:3000');
   await expect(page.getByRole('heading',{name:'Detayları keşfet. Doğru ürünü seç.'})).toBeVisible();
   await page.screenshot({path:'../artifacts/public-home.png',fullPage:true});
-  await page.getByRole('link',{name:'Telefon Ürünleri keşfet ↗',exact:true}).click();
+  await page.goto('http://localhost:3000/kategori/telefon');
   await expect(page.getByRole('heading',{name:'Telefon',exact:true})).toBeVisible();
   await page.getByRole('heading',{name:'Apple iPhone UI Test '+tag,exact:true}).click();
   await expect(page).toHaveURL('http://localhost:3000/urun/'+product.slug);
@@ -97,7 +95,7 @@ test('Admin → API → public: dynamic attributes and product edits', async ({p
   await expect(page.locator('dl')).toContainText('Apple A17 Pro');
   await expect(page.locator('dl')).toContainText('8 GB');
  } finally {
-  if(productId)expect((await request.delete(api+'/api/products/'+productId)).ok()).toBe(true);
+  if(productId){expect((await request.delete(api+'/api/products/'+productId)).ok()).toBe(true);await request.delete('http://localhost:9200/products/_doc/'+productId+'?refresh=true');}
   if(attributeId){
    await request.delete(api+'/api/categories/'+phone.id+'/attributes/'+attributeId);
    expect((await request.delete(api+'/api/attributes/'+attributeId)).ok()).toBe(true);

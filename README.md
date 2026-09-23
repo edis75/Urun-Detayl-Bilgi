@@ -272,3 +272,152 @@ sonuçları [AUDIT.md](AUDIT.md) dosyasındadır.
 Public 404 notu: Next.js `loading.tsx` ile yanıtı stream ettiğinde HTTP durumu
 200 kalabilir; bulunamayan kayıt için 404 ekranı ve `noindex` etiketi üretilir.
 API bulunamayan ürün slug'ında HTTP 404 döndürür. Testler bu ayrımı gözetir.
+
+### Elasticsearch altyapısı
+
+`Elastic.Clients.Elasticsearch 8.12.1`, Elasticsearch 8.12.0 sunucusu ile kullanılır.
+`ProductCompare.Api/appsettings.json` içindeki `Elasticsearch` bölümünde `Url`,
+`ProductIndex` (alias: `products`) ve `ProductPhysicalIndex` (`products_v3`) bulunur.
+Ortam değişkenleriyle örneğin `Elasticsearch__Url` üzerinden değiştirilebilir.
+API başlangıcında eksik index ve alias oluşturulur; mevcut index silinmez ve
+mevcut alias başka bir sürüme taşınmışsa korunur. Elasticsearch erişilemiyorsa
+uyarı loglanır, PostgreSQL endpointleri çalışmaya devam eder.
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:5080/api/admin/search/reindex
+Invoke-RestMethod http://localhost:9200/_alias/products
+Invoke-RestMethod http://localhost:9200/products/_count
+```
+
+Reindex, eksik index/alias kurulumunu tekrar dener ve PostgreSQL'den 500 ürünlük
+salt okunur, Id sıralı batch'ler alıp Bulk API ile alias'a yazar. Yanıtın
+`indexedCount` alanı aktarılan ürün sayısıdır; işlem sonunda refresh yapılır.
+Ürün Id'si document `_id` olduğundan tekrar çalıştırmak duplicate oluşturmaz.
+Bulk kısmen başarısız olursa istek başarısız döner; reindex tekrar çalıştırılabilir.
+Marka, kategori ve özellikler tek merkezi EF projection ile yüklenir.
+Kimlikler `long`, fiyat `scaled_float` (100), dinamik özellikler `nested` olarak
+eşlenir. Sayısal özellikler Elasticsearch'te `double` arama hassasiyetindedir;
+PostgreSQL'deki asıl `decimal` değerler değişmez.
+
+Bu aşamada create/update/delete işlemleri otomatik index senkronizasyonu yapmaz.
+Reindex mevcut ürünleri ekler/günceller; PostgreSQL'den silinmiş ürünlerin eski
+document'lerini temizlemez. Tekil index/silme metotları sonraki entegrasyon için
+hazırdır. Entity, DbContext ve migration değişikliği yoktur.
+Projede authentication/authorization bulunmadığından reindex endpointi de
+mevcut API gibi kimlik doğrulamasızdır; `admin` route adı erişim kontrolü sağlamaz.
+
+### Search API
+
+`GET /api/search?q=iphone%2015&page=1&pageSize=20`, yalnızca configuration'daki
+`Elasticsearch:ProductIndex` alias'ından arar. `multi_match` alanları `name^6`,
+`brandName^4`, `categoryName^2` şeklindedir. Varsayılan OR davranışı korunur:
+`iphone 15` iki ürünü de bulabilir ancak iPhone 15 daha yüksek skor alır;
+`A17 Pro` ürün adındaki `Pro` nedeniyle diğer ürünlerle de eşleşebilir.
+Root sorgu, `attributes` nested sorgusuyla `bool.should` / `minimum_should_match=1`
+üzerinden birleşir. Nested alanlar `attributes.textValue^3`, `attributes.name^1`
+ve `attributes.code` şeklindedir. Sonuçlar Elasticsearch skor sırasındadır.
+`<number> <unit>` biçimi (ör. `120 Hz`, `24 Ay`, `6.1 inch`, `0.187 KG`)
+invariant culture ile ayrıştırılır; sayı ve birim aynı nested nesnede exact term
+ile eşleşir. Ondalık ayırıcı noktadır; birimler keyword mapping nedeniyle
+büyük/küçük harfe duyarlıdır. Numeric alan full-text sorgusuna dahil edilmez.
+Root arama her zaman korunur. `name` için `match_phrase` boost 12 eklenir.
+Yalnızca name/brandName üzerinde boost 0.3, `AUTO:4,7`, prefix_length 1 ve
+max_expansions 25 ile fuzzy destek vardır; dört karakterden kısa token'larda
+fuzzy edit yapılmaz. Bu ağırlıklar mevcut iki örnek ürünle doğrulanmıştır;
+aksesuar/ürün ayrımı için ayrı bir kategori sıralama kuralı yoktur.
+
+Yanıt mevcut `total` (Int64), `page`, `pageSize`, `items` alanlarını korur ve
+ek olarak `facets` döndürür.
+Her item kimlik, ad, marka/kategori kimliği ve adı, fiyat ve `score` içerir.
+Hem sorgu hem kategori boşsa, page < 1, pageSize 1–100 dışında veya ilk 10000 sonuç penceresini
+aşan sayfalama HTTP 400 döndürür. Elasticsearch hataları mevcut hata işleyicisi
+ile loglanır ve HTTP 500 döner; PostgreSQL'e fallback yapılmaz.
+
+**Türkçe normalizasyon ve index geçişi:** `products_v2` içindeki `product_text`
+analyzer standard tokenizer → Turkish lowercase → asciifolding kullanır.
+Stemming yoktur; name, brandName, categoryName ve nested text/name alanlarına
+uygulanır. Exact keyword alt alanları filtre/facet değerlerini olduğu gibi korur.
+Mevcut field analyzer'ları yerinde değiştirilmez.
+
+```powershell
+# Yalnızca yeni, boş ve henüz aktif olmayan ProductPhysicalIndex hedefine geçiş:
+Invoke-RestMethod -Method Post http://localhost:5080/api/admin/search/migrate-index
+```
+
+Bu işlem aynı mapper ve 500 kayıtlık bulk akışını kullanır; PostgreSQL'de
+repeatable-read snapshot alır. Bulk hatası veya kayıt sayısı farkında alias
+taşınmaz. Başarılı aktarım/refresh/sayım sonrası alias tek `_aliases` isteğinde
+atomik değiştirilir. Eski index silinmez. Bu sürümde `products → products_v2`
+geçişi tamamlandı; `products_v1` korunmuştur. Normal reindex aktif alias'a
+yazmaya devam eder; uygulama başlangıcı otomatik migration/reindex yapmaz.
+Geçişi ürün yazımlarının durduğu bakım aralığında ve tek operatörle çalıştırın;
+henüz otomatik CRUD senkronizasyonu yoktur. Kısmi aktarım sonrası dolu hedef
+otomatik temizlenmez; operatör yeni boş bir versioned hedef seçmelidir.
+Migration endpointi mevcut admin endpointleri gibi auth eklemez.
+
+**Suggestions:** `GET /api/search/suggestions?q=iph`, aynı alias üzerinde
+`match_phrase_prefix` (max_expansions 25) kullanır; yalnız aktif ürünlerden
+en fazla 10 öneri döndürür. İki karakterden kısa sorgular Elasticsearch'e
+gönderilmeden `[]` döner. Yanıt sadece id/name/brandName/categoryName/currentPrice
+içerir; `_source` alanları da bunlarla sınırlıdır. Ayrı index veya frontend UI yoktur.
+
+**Filtreler ve facets:**
+
+```http
+GET /api/search?q=iphone&categoryId=2&brandIds=1&brandIds=2&minPrice=30000&maxPrice=80000&isActive=true&filters[ram]=8&filters[storage]=256&filters[has_5g]=true
+```
+
+BrandIds tekrarlı query parametresidir (virgüllü liste değil). Dinamik filtreler
+için categoryId zorunludur. CategoryAttribute.IsFilterable metadata'sı tek
+PostgreSQL sorgusuyla DisplayOrder sırasıyla okunur; bilinmeyen, filtrelenemez
+veya tipi hatalı filtreler HTTP 400 verir. Numeric (noktalı ondalık), Boolean,
+Text (exact/case-sensitive keyword) ve Date (UTC anına karşılık gelen exact
+milisaniye) değerleri desteklenir. Birden fazla attribute filtresi AND, brandIds
+OR mantığındadır. Code+value her filtrede aynı nested nesneye bağlanır.
+Tüm filtreler `bool.filter` içindedir; skorları değiştirmez.
+Mevcut davranış korunur: isActive belirtilmezse Search API aktiflik filtresi
+uygulamaz. Boş q hâlâ HTTP 400 döndürür; yalnız filtreli gezinme eklenmemiştir.
+
+`facets.brands` id/name/count, `minPrice`/`maxPrice` fiyat sınırları ve
+`facets.attributes` code/name/unit/dataType/displayOrder/values içerir.
+Örnek RAM values: `[{"value":6,"count":1},{"value":8,"count":1}]`.
+Sayım tüm filtrelenmiş sonuçlar üzerindedir, yalnız mevcut sayfa üzerinde değildir.
+Kategori seçilmezse attribute facets boş döner. Seçilirse yalnız filterable
+attribute'lar üretilir; her code altında ilgili değer alanı aggregate edilir.
+Brand ve her attribute için en fazla 100 değer döndürülür (terms aggregation'ın
+en sık değerleri). Self-excluding facets, numeric attribute range, synonym ve
+otomatik sync eklenmemiştir.
+
+İki örnek iPhone indexte mevcutken salt okunur arama testleri:
+
+```powershell
+./scripts/search-smoke-test.ps1 -BaseUrl http://localhost:5080
+```
+
+
+### Kategori ağacı ve kategori üzerinden arama
+
+Mevcut Category şeması zaten parent FK, unique slug, DisplayOrder ve IsActive içerdiği için yeni EF migration yoktur. Product.CategoryId korunur; join table eklenmez.
+
+- GET /api/categories/tree: tek kategori sorgusuyla aktif, DisplayOrder/Id sıralı ağaç. Pasif ataların alt dalları yayınlanmaz.
+- GET /api/categories/by-slug/{slug}: parent, immediate children ve kökten başlayan breadcrumb.
+- Category CRUD isteği opsiyonel slug kabul eder; mevcut SlugService normalizasyonunu kullanır. Explicit slug çakışması reddedilir; slug gönderilmeyen güncellemelerde URL korunur. Parent döngüsü tek kategori snapshot'ında doğrulanır.
+- Kategori listesinde pathName ve isSelectable admin seçeneklerini besler. Ürün oluşturma/güncelleme aktif atalara sahip aktif leaf ister.
+- GET /api/search?categoryId=1&page=1&pageSize=24: kategori-only listeleme. bool.filter içindeki categoryPathIds terimi tüm subtree'yi kapsar; q varsa mevcut relevance sorgusuyla birleşir.
+- Search yanıtı mevcut items alanını korur. products alanı yalnızca Elasticsearch'ün seçtiği sayfanın kart detaylarını PostgreSQL'den toplu olarak yükler; ürün başına HTTP/SQL sorgusu yoktur. Sayım, filtreleme, sıralama ve sayfalama Elasticsearch'tedir.
+- facets.children: immediate child başına aynı Elasticsearch isteğinde filters aggregation sayımı. facets.categories: leaf kategori dağılımı. Dinamik metadata sadece bağlam kategorisinin IsFilterable atamalarından gelir; child özellikleri birleştirilmez.
+- categoryContext yalnızca benzersiz normalize ad/slug eşleşmesinde veya explicit categoryId ile verilir. Intent metin sonuçlarını otomatik daraltmaz ve redirect yapmaz. Arama sayfasında bu bağlamın filtresini uygulamak explicit categoryId gönderir.
+- sort: relevance (metin varsa score DESC, tie-break Id DESC), newest (mevcut Id DESC), price_asc, price_desc. Kategori-only varsayılanı Id DESC. Yapay popularity alanı yoktur.
+
+Mevcut /kategori/[slug] sayfası ve ProductCard korunur. Header içindeki kategori menüsü tree API kullanır; mobil ve klavyede açılır, seçimle kapanır. /arama sayfası ve kategori sayfası CatalogResults/FilterSidebar paylaşır. Filtreler, sıralama ve sayfa URL query string'inde saklanır. Marka/fiyat ve DataType tabanlı seçenekler API metadata ve aggregation değerlerinden çizilir; kategoriye özel hard-code yoktur.
+
+**İndeks geçişi (24 Eylül 2026):** canlı products alias önce kontrol edildi: products_v2. Yeni products_v3 oluşturuldu; PostgreSQL'deki 2 ürün mevcut mapper/batch reindex ile aktarıldı, refresh ve kayıt sayımı sonrası alias atomik geçirildi. products_v1/products_v2 silinmedi. Yeni mapping: categoryPathIds (long), categoryPathNames (mevcut analyzer ile text), categoryPathSlugs (keyword). Kategori snapshot'ı reindex boyunca bir kez okunur; her path root → leaf sırasındadır. İndeks aktivasyonu ayrıca pathsiz dokümanları reddeder.
+
+Mevcut manuel indeks senkronizasyonu korunmuştur: kategori adı/parent/aktiflik ve ürün değişikliklerinden sonra reindex çalıştırılmalıdır. Normal reindex silinmiş ürün dokümanlarını temizlemez; bu mevcut sınırlama değişmemiştir. Yeni version geçişlerinde önce alias hedefini okuyun, boş yeni fiziksel hedefi yapılandırın, yazımların durduğu bakım aralığında mevcut migrate-index endpointini kullanın. Başarısız hedef veya eski indeks otomatik silinmez.
+
+Doğrulama:
+
+- node scripts/category-smoke-test.mjs: geçici üç seviyeli ağaç, aktiflik, breadcrumb, slug/döngü, parent ürün reddi, telefon/buzdolabı metadata ayrımı, counts, intent, sorting, pagination, indexed paths. Test kendi oluşturduğu DB ve ES kayıtlarını temizler.
+- powershell -File scripts/search-smoke-test.ps1: mevcut relevance, typo, Turkish normalization, autocomplete, nested attribute aramaları ve dinamik filtre regresyonları.
+- ProductCompare.Admin altında npm run test:e2e -- tests/category.spec.ts tests/search.spec.ts: gerçek yerel API ile masaüstü/mobil kategori gezinmesi, URL filtresi, admin selector ve mevcut home search. API_URL, SEARCH_WEB_URL ve ADMIN_URL opsiyoneldir.
+- dotnet build ProductCompare.sln; iki frontend klasöründe npm run build.

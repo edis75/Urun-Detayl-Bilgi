@@ -34,10 +34,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         p.Property(x => x.Name).IsRequired().HasMaxLength(300); p.Property(x => x.Slug).IsRequired().HasMaxLength(350);
         p.HasIndex(x => x.Slug).IsUnique(); p.HasIndex(x => x.IsActive);
         p.Property(x => x.ModelCode).HasMaxLength(150); p.Property(x => x.ShortDescription).HasMaxLength(1000);
-        p.Property(x => x.Description).HasColumnType("text"); p.Property(x => x.CurrentPrice).HasPrecision(18, 2);
-        p.Property(x => x.Currency).IsRequired().HasMaxLength(3).HasDefaultValue("TRY");
+        p.Property(x => x.Description).HasColumnType("text");
         p.Property(x => x.MainImageUrl).HasMaxLength(2048); p.Property(x => x.IsActive).HasDefaultValue(true);
-        p.ToTable(t => t.HasCheckConstraint("CK_Product_Price", "\"CurrentPrice\" >= 0"));
         var v = m.Entity<ProductAttributeValue>(); v.HasKey(x => new { x.ProductId, x.AttributeDefinitionId });
         v.HasOne(x => x.Product).WithMany(x => x.AttributeValues).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
         v.HasOne(x => x.AttributeDefinition).WithMany().HasForeignKey(x => x.AttributeDefinitionId).OnDelete(DeleteBehavior.Restrict);
