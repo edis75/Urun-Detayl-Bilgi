@@ -1,6 +1,6 @@
 import 'server-only';
 import { cache } from 'react';
-import type { Category, CategoryNode, CategoryDetail, Brand, Product, Page, ProductFilters, Comparison, ProductSearchResponse } from '@/types/catalog';
+import type { Category, CategoryNode, CategoryDetail, Brand, Product, ProductDetail, Page, ProductFilters, Comparison, ProductSearchResponse } from '@/types/catalog';
 export class ApiError extends Error { constructor(public status:number,message:string){super(message);} }
 async function get<T>(path:string):Promise<T>{
  const base=process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -17,7 +17,7 @@ async function get<T>(path:string):Promise<T>{
 export const getCategories=cache(()=>get<Category[]>('/api/categories'));
 export const getCategoryTree=cache(()=>get<CategoryNode[]>('/api/categories/tree'));
 export const getBrands=cache(()=>get<Brand[]>('/api/brands'));
-export const getProduct=cache((slug:string)=>get<Product>('/api/products/by-slug/'+encodeURIComponent(slug)));
+export const getProduct=cache((slug:string)=>get<ProductDetail>('/api/products/by-slug/'+encodeURIComponent(slug)));
 export const getComparison=(productIds:string)=>get<Comparison>('/api/compare?productIds='+encodeURIComponent(productIds));
 export async function searchProducts(query:string){
  return (await searchCatalog({q:query})).products;

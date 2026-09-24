@@ -1,3 +1,43 @@
 docker compose stop elasticsearch
 docker compose start elasticsearcha
 docker compose down
+
+
+elasticsearch roadmap 
+
+
+ Elasticsearch Docker ile kuruldu ve localhost:9200 çalışıyor
+ ProductCompare.Api projesine Elastic.Clients.Elasticsearch 8.x paketi ekle
+ appsettings.json içine Elasticsearch bağlantısını ekle
+ Program.cs içinde Elasticsearch client dependency injection ayarla
+ ProductSearchDocument modelini oluştur
+ Dinamik ürün özellikleri için ProductSearchAttribute modelini oluştur
+ products_v1 Elasticsearch index'ini oluştur
+ products alias oluştur ve products_v1 index'ine bağla
+ PostgreSQL → Elasticsearch dönüşüm servisini oluştur
+ Mevcut ürünleri PostgreSQL'den Elasticsearch'e aktaran Reindex işlemini yaz
+ İlk test: iPhone 14 Pro ve iPhone 15 Pro Elasticsearch'te görünüyor mu kontrol et
+ GET /api/search?q=iphone endpoint'ini oluştur
+ Ürün adı + marka + kategori + özelliklerde arama yaptır
+ Relevance/boost ayarla: ürün adı en yüksek öncelikli olsun
+ Typo tolerance ekle: ipone, samsng, iphne gibi hataları bulsun
+ Türkçe karakter/normalizasyon desteği ekle: buzdolabi → buzdolabı
+ Autocomplete endpoint'i oluştur: iph → iPhone 15 Pro
+ Kategori bazlı dinamik filtre sistemi ekle
+ Marka, fiyat ve attribute filtrelerini Elasticsearch'e bağla
+ Aggregation ekle: 8 GB (42 ürün) gibi adetleri getir
+ Synonym sistemi ekle: notebook ↔ laptop, tv ↔ televizyon
+ Admin ürün eklediğinde Elasticsearch'e otomatik indexle
+ Admin ürün güncellediğinde Elasticsearch'ü güncelle
+ Ürün silindiğinde Elasticsearch'ten kaldır
+ Elasticsearch tamamen silinse bile PostgreSQL'den yeniden oluşturulabilecek Reindex All sistemi yap
+ Search sonuçlarında pagination + sorting ekle
+ React frontend arama kutusunu /api/search endpoint'ine bağla
+ Autocomplete dropdown'u frontend'e bağla
+ Filtre panelini Elasticsearch aggregation sonuçlarıyla bağla
+ Production Docker Compose'a Elasticsearch ekle
+ Production'da 9200 portunu internete kapat
+ Elasticsearch data volume + backup/reindex stratejisini tamamla
+ Gerçek ürünlerle search kalite testleri yap
+
+Şu an durumumuz:

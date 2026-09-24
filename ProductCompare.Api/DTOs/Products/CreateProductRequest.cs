@@ -9,6 +9,9 @@ public class CreateProductRequest
     [MaxLength(150)] public string? ModelCode { get; set; }
     [MaxLength(1000)] public string? ShortDescription { get; set; }
     public string? Description { get; set; }
+    public string? ContentHtml { get; set; }
+    public string[]? Pros { get; set; }
+    public string[]? Cons { get; set; }
     [MaxLength(2048), Url] public string? MainImageUrl { get; set; }
     public bool IsActive { get; set; } = true;
     [Required] public List<ProductAttributeValueRequest> Attributes { get; set; } = [];

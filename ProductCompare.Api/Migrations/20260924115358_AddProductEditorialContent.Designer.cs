@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ProductCompare.Api.Data;
@@ -11,9 +12,11 @@ using ProductCompare.Api.Data;
 namespace ProductCompare.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260924115358_AddProductEditorialContent")]
+    partial class AddProductEditorialContent
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -295,53 +298,6 @@ namespace ProductCompare.Api.Migrations
                     b.ToTable("ProductContents");
                 });
 
-            modelBuilder.Entity("ProductCompare.Api.Entities.ProductImage", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ImageUrl")
-                        .IsRequired()
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
-
-                    b.Property<bool>("IsPrimary")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("ObjectKey")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<long>("ProductId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ObjectKey")
-                        .IsUnique();
-
-                    b.HasIndex("ProductId")
-                        .IsUnique()
-                        .HasFilter("\"IsPrimary\" = TRUE");
-
-                    b.HasIndex("ProductId", "SortOrder");
-
-                    b.ToTable("ProductImages", t =>
-                        {
-                            t.HasCheckConstraint("CK_ProductImage_SortOrder", "\"SortOrder\" >= 0");
-                        });
-                });
-
             modelBuilder.Entity("ProductCompare.Api.Entities.Category", b =>
                 {
                     b.HasOne("ProductCompare.Api.Entities.Category", "ParentCategory")
@@ -420,17 +376,6 @@ namespace ProductCompare.Api.Migrations
                     b.Navigation("Product");
                 });
 
-            modelBuilder.Entity("ProductCompare.Api.Entities.ProductImage", b =>
-                {
-                    b.HasOne("ProductCompare.Api.Entities.Product", "Product")
-                        .WithMany("Images")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Product");
-                });
-
             modelBuilder.Entity("ProductCompare.Api.Entities.Category", b =>
                 {
                     b.Navigation("Children");
@@ -441,8 +386,6 @@ namespace ProductCompare.Api.Migrations
                     b.Navigation("AttributeValues");
 
                     b.Navigation("Content");
-
-                    b.Navigation("Images");
                 });
 #pragma warning restore 612, 618
         }

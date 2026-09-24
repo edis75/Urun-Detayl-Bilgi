@@ -18,6 +18,8 @@ builder.Services.AddScoped<CategoryService>();
 builder.Services.AddScoped<BrandService>();
 builder.Services.AddScoped<AttributeService>();
 builder.Services.AddScoped<ProductService>();
+builder.Services.AddScoped<IR2StorageService, R2StorageService>();
+builder.Services.AddScoped<ProductImageService>();
 builder.Services.AddScoped<ComparisonService>();
 builder.Services.AddSingleton(sp => new ElasticsearchClient(new ElasticsearchClientSettings(
     new Uri(sp.GetRequiredService<IConfiguration>()["Elasticsearch:Url"]

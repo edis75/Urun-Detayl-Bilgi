@@ -5,7 +5,7 @@ using ProductCompare.Api.Entities;
 using ProductCompare.Api.Enums;
 namespace ProductCompare.Api.Services;
 
-public class ProductService(AppDbContext db, SlugService slugs)
+public class ProductService(AppDbContext db, SlugService slugs, ProductImageService images)
 {
     private IQueryable<Product> Details => db.Products.AsNoTracking().Include(x => x.Category).Include(x => x.Brand).Include(x => x.AttributeValues).ThenInclude(x => x.AttributeDefinition);
     private async Task<List<ProductResponse>> MapAsync(List<Product> products, CancellationToken ct)
@@ -34,16 +34,22 @@ public class ProductService(AppDbContext db, SlugService slugs)
         AttributeDataType.Date => v.DateValue,
         _ => null
     };
-    public async Task<ProductResponse> GetAsync(long id, CancellationToken ct) =>
-     (await MapAsync([await Details.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw ApiException.NotFound()], ct))[0];
+    private async Task<ProductDetailResponse> MapDetailAsync(Product product, CancellationToken ct) =>
+        new((await MapAsync([product], ct))[0], product.Content?.ContentHtml ?? "", product.Content?.Pros ?? [], product.Content?.Cons ?? [])
+        {
+            Images = product.Images.OrderByDescending(x => x.IsPrimary).ThenBy(x => x.SortOrder).ThenBy(x => x.Id)
+                .Select(x => new ProductImageResponse(x.Id, x.ImageUrl, x.IsPrimary, x.SortOrder)).ToList()
+        };
+    public async Task<ProductDetailResponse> GetAsync(long id, CancellationToken ct) =>
+        await MapDetailAsync(await Details.Include(x => x.Content).Include(x => x.Images).AsSplitQuery().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw ApiException.NotFound(), ct);
     public async Task<List<ProductResponse>> GetManyAsync(long[] ids, CancellationToken ct)
     {
         var products = await MapAsync(await Details.Where(p => ids.Contains(p.Id)).ToListAsync(ct), ct);
         var byId = products.ToDictionary(p => p.Id);
         return ids.Where(byId.ContainsKey).Select(id => byId[id]).ToList();
     }
-    public async Task<ProductResponse> BySlugAsync(string slug, CancellationToken ct) =>
-     (await MapAsync([await Details.SingleOrDefaultAsync(x => x.Slug == slug, ct) ?? throw ApiException.NotFound()], ct))[0];
+    public async Task<ProductDetailResponse> BySlugAsync(string slug, CancellationToken ct) =>
+        await MapDetailAsync(await Details.Include(x => x.Content).Include(x => x.Images).AsSplitQuery().SingleOrDefaultAsync(x => x.Slug == slug, ct) ?? throw ApiException.NotFound(), ct);
     public async Task<PagedResponse<ProductResponse>> ListAsync(long? categoryId, long? brandId, bool? isActive, int page, int pageSize, CancellationToken ct, string? search = null)
     {
         if (page < 1 || pageSize < 1 || pageSize > 100 || (long)(page - 1) * pageSize > int.MaxValue) throw ApiException.Invalid("page >= 1 ve pageSize 1–100 olmalıdır.");
@@ -80,10 +86,10 @@ public class ProductService(AppDbContext db, SlugService slugs)
             if (!values.Any(x => x.AttributeDefinitionId == r.AttributeDefinitionId)) errors.Add($"{r.AttributeDefinition.Name} alanı zorunludur.");
         return errors;
     }
-    public async Task<ProductResponse> SaveAsync(long? id, CreateProductRequest r, CancellationToken ct)
+    public async Task<ProductDetailResponse> SaveAsync(long? id, CreateProductRequest r, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
-        var p = id.HasValue ? await db.Products.Include(x => x.AttributeValues).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw ApiException.NotFound() : new Product();
+        var p = id.HasValue ? await db.Products.Include(x => x.Content).Include(x => x.AttributeValues).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw ApiException.NotFound() : new Product();
         var categories = await db.Categories.AsNoTracking().ToDictionaryAsync(c => c.Id, ct);
         if (CategoryService.Path(r.CategoryId, categories).Any(c => !c.IsActive))
             throw ApiException.Invalid("Aktif bir kategori seçin.");
@@ -96,7 +102,18 @@ public class ProductService(AppDbContext db, SlugService slugs)
         p.Slug = await slugs.CreateAsync<Product>(r.Name, 350, id, ct);
         p.Name = r.Name.Trim(); p.CategoryId = r.CategoryId; p.BrandId = r.BrandId; p.ModelCode = r.ModelCode;
         p.ShortDescription = r.ShortDescription; p.Description = r.Description;
-        p.MainImageUrl = r.MainImageUrl; p.IsActive = r.IsActive; p.UpdatedAtUtc = DateTime.UtcNow;
+        // Omitted editorial fields preserve content for existing API clients. Empty values clear it.
+        if (r.ContentHtml is not null || r.Pros is not null || r.Cons is not null)
+        {
+            p.Content ??= new ProductContent();
+            if (r.ContentHtml is not null) p.Content.ContentHtml = ProductContentSanitizer.Sanitize(r.ContentHtml);
+            if (r.Pros is not null) p.Content.Pros = ProductContentSanitizer.Normalize(r.Pros);
+            if (r.Cons is not null) p.Content.Cons = ProductContentSanitizer.Normalize(r.Cons);
+        }
+        // The existing cover field remains the source used by cards/search/compare.
+        // Ordinary JSON product edits must not overwrite a managed R2 cover.
+        if (!id.HasValue || !await db.ProductImages.AnyAsync(x => x.ProductId == id.Value, ct)) p.MainImageUrl = r.MainImageUrl;
+        p.IsActive = r.IsActive; p.UpdatedAtUtc = DateTime.UtcNow;
         var incoming = r.Attributes.Select(x => x.AttributeDefinitionId).ToHashSet();
         foreach (var old in p.AttributeValues.Where(x => !incoming.Contains(x.AttributeDefinitionId)).ToList())
         { db.ProductAttributeValues.Remove(old); p.AttributeValues.Remove(old); }
@@ -110,9 +127,5 @@ public class ProductService(AppDbContext db, SlugService slugs)
         await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
         return await GetAsync(p.Id, ct);
     }
-    public async Task DeleteAsync(long id, CancellationToken ct)
-    {
-        var p = await db.Products.FindAsync([id], ct) ?? throw ApiException.NotFound();
-        db.Products.Remove(p); await db.SaveChangesAsync(ct);
-    }
+    public Task DeleteAsync(long id, CancellationToken ct) => images.DeleteProductAsync(id, ct);
 }

@@ -2,6 +2,8 @@ namespace ProductCompare.Api.Entities;
 
 public class Product : CatalogEntity
 {
+    public ProductContent? Content { get; set; }
+    public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
     public long CategoryId { get; set; }
     public Category Category { get; set; } = null!;
     public long BrandId { get; set; }

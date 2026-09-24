@@ -9,6 +9,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AttributeDefinition> AttributeDefinitions => Set<AttributeDefinition>();
     public DbSet<CategoryAttribute> CategoryAttributes => Set<CategoryAttribute>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductContent> ProductContents => Set<ProductContent>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<ProductAttributeValue> ProductAttributeValues => Set<ProductAttributeValue>();
     protected override void OnModelCreating(ModelBuilder m)
     {
@@ -35,6 +37,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         p.HasIndex(x => x.Slug).IsUnique(); p.HasIndex(x => x.IsActive);
         p.Property(x => x.ModelCode).HasMaxLength(150); p.Property(x => x.ShortDescription).HasMaxLength(1000);
         p.Property(x => x.Description).HasColumnType("text");
+        var content = m.Entity<ProductContent>();
+        content.HasKey(x => x.ProductId);
+        content.HasOne(x => x.Product).WithOne(x => x.Content).HasForeignKey<ProductContent>(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
+        content.Property(x => x.ContentHtml).HasColumnType("text").IsRequired();
+        content.Property(x => x.Pros).HasColumnType("text[]").IsRequired();
+        content.Property(x => x.Cons).HasColumnType("text[]").IsRequired();
+        var image = m.Entity<ProductImage>();
+        image.HasKey(x => x.Id);
+        image.HasOne(x => x.Product).WithMany(x => x.Images).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
+        image.Property(x => x.ImageUrl).HasMaxLength(2048).IsRequired();
+        image.Property(x => x.ObjectKey).HasMaxLength(512).IsRequired();
+        image.HasIndex(x => x.ObjectKey).IsUnique();
+        image.HasIndex(x => new { x.ProductId, x.SortOrder });
+        image.HasIndex(x => x.ProductId).IsUnique().HasFilter("\"IsPrimary\" = TRUE");
+        image.ToTable(t => t.HasCheckConstraint("CK_ProductImage_SortOrder", "\"SortOrder\" >= 0"));
         p.Property(x => x.MainImageUrl).HasMaxLength(2048); p.Property(x => x.IsActive).HasDefaultValue(true);
         var v = m.Entity<ProductAttributeValue>(); v.HasKey(x => new { x.ProductId, x.AttributeDefinitionId });
         v.HasOne(x => x.Product).WithMany(x => x.AttributeValues).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);

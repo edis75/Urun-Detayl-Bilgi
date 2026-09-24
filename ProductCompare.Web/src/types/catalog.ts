@@ -6,6 +6,8 @@ export interface CategoryAttribute { attribute: AttributeDefinition; isRequired:
 export interface CategoryAttributeRequest { attributeDefinitionId: number; isRequired: boolean; isFilterable: boolean; isComparable: boolean; displayOrder: number }
 export interface TechnicalAttribute { attributeId: number; name: string; code: string; dataType: AttributeDataType; value: string | number | boolean | null; unit: string | null }
 export interface CatalogReference { id: number; name: string; slug: string }
+export interface ProductImage { id:number; imageUrl:string; isPrimary:boolean; sortOrder:number }
+export interface ProductDetail extends Product { images: ProductImage[]; contentHtml: string; pros: string[]; cons: string[] }
 export interface Product { id: number; name: string; slug: string; modelCode: string | null; category: CatalogReference; brand: CatalogReference; shortDescription: string | null; description: string | null; mainImageUrl: string | null; isActive: boolean; createdAtUtc: string; updatedAtUtc: string; attributes: TechnicalAttribute[]; summaryAttributes: TechnicalAttribute[] }
 export interface ProductAttributeValueRequest { attributeDefinitionId: number; textValue?: string; numericValue?: number; booleanValue?: boolean; dateValue?: string }
 export interface ProductRequest { categoryId: number; brandId: number; name: string; modelCode: string | null; shortDescription: string | null; description: string | null; mainImageUrl: string | null; isActive: boolean; attributes: ProductAttributeValueRequest[] }
