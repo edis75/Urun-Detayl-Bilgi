@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './auth-fixture';
 
 test('real API: Admin editorial save reaches public detail and stays out of lists', async ({page,request})=>{
  test.setTimeout(120000);

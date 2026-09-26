@@ -4,6 +4,8 @@ namespace ProductCompare.Api.Data;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
+    public DbSet<User> Users => Set<User>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Brand> Brands => Set<Brand>();
     public DbSet<AttributeDefinition> AttributeDefinitions => Set<AttributeDefinition>();
@@ -14,6 +16,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ProductAttributeValue> ProductAttributeValues => Set<ProductAttributeValue>();
     protected override void OnModelCreating(ModelBuilder m)
     {
+        var u = m.Entity<User>(); u.HasKey(x => x.Id);
+        u.Property(x => x.Email).IsRequired().HasMaxLength(254); u.HasIndex(x => x.Email).IsUnique();
+        u.Property(x => x.PasswordHash).IsRequired().HasMaxLength(512);
+        u.ToTable(t => t.HasCheckConstraint("CK_User_Role", "\"Role\" IN (0, 1)"));
+        var rt = m.Entity<RefreshToken>(); rt.HasKey(x => x.Id);
+        rt.Property(x => x.TokenHash).IsRequired().HasMaxLength(64); rt.HasIndex(x => x.TokenHash).IsUnique();
+        rt.Property(x => x.ReplacedByTokenHash).HasMaxLength(64);
+        rt.HasIndex(x => x.ExpiresAtUtc);
+        rt.HasOne(x => x.User).WithMany(x => x.RefreshTokens).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         var c = m.Entity<Category>(); c.HasKey(x => x.Id);
         c.Property(x => x.Name).IsRequired().HasMaxLength(200);
         c.Property(x => x.Slug).IsRequired().HasMaxLength(250); c.HasIndex(x => x.Slug).IsUnique();

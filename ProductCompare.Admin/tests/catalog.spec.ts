@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './auth-fixture';
 test('Admin → API → public: dynamic attributes and product edits', async ({page,request})=>{
  test.setTimeout(120000);
  const api='http://localhost:5080';

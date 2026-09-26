@@ -1,3 +1,4 @@
+import {loginEditor} from './auth-fixture';
 import { test, expect } from '@playwright/test';
 const web=process.env.SEARCH_WEB_URL??'http://localhost:3000';
 const api=process.env.API_URL??'http://localhost:5080';
@@ -80,6 +81,7 @@ test('admin exposes slug and backend hierarchy labels; parent product options ar
  const categories=await (await request.get(api+'/api/categories')).json();
  const leaf=categories.find((c:{slug:string})=>c.slug==='telefon');
  const root=categories.find((c:{id:number})=>c.id===leaf.parentCategoryId);
+ await loginEditor(request,page.context());
  await page.goto(admin+'/admin/categories');
  await page.getByRole('button',{name:'+ Yeni kategori'}).click();
  await expect(page.locator('input[name="slug"]')).toBeVisible();

@@ -47,3 +47,7 @@ Check(entity.GetForeignKeys().Single().DeleteBehavior == DeleteBehavior.Cascade,
 Check(entity.FindProperty("ContentHtml")!.GetColumnType() == "text", "HTML column type");
 Check(entity.FindProperty("Pros")!.GetColumnType() == "text[]" && entity.FindProperty("Cons")!.GetColumnType() == "text[]", "Structured point columns");
 Console.WriteLine("PASS: HTML formatting, XSS sanitization, point normalization and EF model. No database connection made.");
+
+if (Environment.GetEnvironmentVariable("AUTH_TEST_CONNECTION") is { Length: > 0 } authConnection)
+    await AuthChecks.RunAsync(authConnection);
+else Console.WriteLine("Auth integration checks not run: set AUTH_TEST_CONNECTION to a PostgreSQL database where a temporary schema can be created.");

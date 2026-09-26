@@ -32,12 +32,7 @@ builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-if (builder.Environment.IsDevelopment())
-{
-    builder.Services.AddCors(options => options.AddPolicy("FrontendDevelopment", policy =>
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
-            .AllowAnyHeader().AllowAnyMethod()));
-}
+builder.Services.AddProductCompareAuthentication(builder.Configuration, builder.Environment);
 var app = builder.Build();
 app.UseExceptionHandler();
 app.UseStatusCodePages(async context =>
@@ -47,7 +42,6 @@ app.UseStatusCodePages(async context =>
 });
 if (app.Environment.IsDevelopment())
 {
-    app.UseCors("FrontendDevelopment");
     app.UseSwagger(); app.UseSwaggerUI();
     if (builder.Configuration.GetValue<bool>("SeedData:Enabled"))
     {
@@ -55,6 +49,10 @@ if (app.Environment.IsDevelopment())
         await SeedData.InitializeAsync(scope.ServiceProvider);
     }
 }
+app.UseCors("Frontend");
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseMiddleware<CsrfMiddleware>();
 app.MapControllers();
 try
 {
@@ -65,3 +63,4 @@ catch (Exception exception)
     app.Logger.LogWarning(exception, "Elasticsearch initialization failed. PostgreSQL endpoints remain available; reindex will retry initialization.");
 }
 app.Run();
+public partial class Program { }

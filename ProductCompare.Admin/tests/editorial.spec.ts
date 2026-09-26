@@ -7,7 +7,9 @@ test('editorial create/edit UI keeps structured points separate from visual cont
   const path=new URL(route.request().url()).pathname;
   if(!path.startsWith('/api/')){await route.continue();return;}
   let data:unknown=[];
-  if(path==='/api/categories')data=[{id:1,name:'Phone',pathName:'Phone',isSelectable:true,isActive:true}];
+  if(path==='/api/auth/me')data={id:1,email:'editor@example.test',role:'Editor'};
+  else if(path==='/api/auth/csrf')data={token:'test-csrf'};
+  else if(path==='/api/categories')data=[{id:1,name:'Phone',pathName:'Phone',isSelectable:true,isActive:true}];
   else if(path==='/api/brands')data=[{id:1,name:'Brand',isActive:true}];
   else if(path==='/api/products/42'){
    if(route.request().method()==='PUT')saved=route.request().postDataJSON();
